@@ -1,0 +1,753 @@
+
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\Debug.as
+package com.blitzagency.xray.logger{import flash.utils.*;import com.blitzagency.xray.logger.events.DebugDispatcher;import flash.net.LocalConnection;import flash.events.StatusEvent;/**
+Debug class for use with bit-101 Flash Debug Panel    See www.bit-101.com/DebugPanel    This work is licensed under a Creative Commons Attribution 2.5 License.    See http://creativecommons.org/licenses/by/2.5/        Authors: Keith Peters and Tim Walling    www.bit-101.com    www.timwalling.com		Modified for Xray:	John Grden	neoRiley@gmail.com	www.osflash.org/xray
+*/
+public class Debug{private static var xrayLC : LocalConnection;private static var connected : Boolean;private static var ed : DebugDispatcher;private static function initialize () : Boolean;private static function makeConnection () : void;private static function statusHandler (event:StatusEvent) : void;public static function addEventListener (type:String, listener:Function) : void;/**
+*	Traces any value to the debug panel, with an optional message level.		 *	@param pMsg The value to trace.		 *	@param pLvl Optional. The level for this message. Values are 0 through 4, or Debug.Debug, Debug.INFO, Debug.WARN, Debug.ERROR, Debug.FATAL.
+*/
+public static function trace (pMsg:Object, pPackage:String = "", pLevel:Number = 0) : void;/**
+*	Recursively traces an object's value to the debug panel.		 *	@param o The object to trace.		 *	@param pRecurseDepth Optional. How many levels deep to recursively trace. Defaults to 0, which traces only the top level value.		 *	@param pIndent Optional. Number of spaces to indent each new level of recursion.		 * 	@param pPackage - passed in via XrayLogger.  Package info sent along to Xray's interface for package filtering
+*/
+public static function traceObject (o:Object, pRecurseDepth:Number = 254, pIndent:Number = 0, pPackage:String = "", pLevel:Number = 0) : void;}internal class LogError extends Error{public function LogError (message:String);}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\Log.as
+package com.blitzagency.xray.logger{import com.blitzagency.xray.logger.XrayLogger;import com.blitzagency.xray.logger.util.ObjectTools;import com.blitzagency.xray.logger.Debug;public class Log{private var message : String;private var dump : Object;private var level : Number;private var classPackage : String;private var caller : String;/**
+* I generate an error in the constructor as to force the debugger to give me the stackTrace		* Supposedly, this won't work in the regular player, and as of 8/28/2006, I haven't tried it ;) 		*
+*/
+public function Log (p_message:String, p_dump:Object, p_level:Number, ...rest);public function setMessage (p_message:String) : void;public function setDump (p_dump:Object) : void;public function setLevel (p_level:Number) : void;public function getMessage () : String;public function getDump () : Object;public function getLevel () : Number;public function getClassPackage () : String;public function setClassPackage (obj:Object) : void;private function resolveCaller (str:String) : String;public function setCaller (p_caller:String) : void;public function getCaller () : String;}internal class LogError extends Error{public function LogError (message:String);}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\Logger.as
+package com.blitzagency.xray.logger{import com.blitzagency.xray.logger.Log;public interface Logger{public function setLevel (p_level:Number = 0) : void;public function debug (obj:Log) : void;public function info (obj:Log) : void;public function warn (obj:Log) : void;public function error (obj:Log) : void;public function fatal (obj:Log) : void;public function log (message:String, caller:String, classPackage:String, level:Number, dump:Object = null) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\XrayLog.as
+package com.blitzagency.xray.logger{import com.blitzagency.xray.logger.XrayLogger;import com.blitzagency.xray.logger.Log;public class XrayLog{private var logger : XrayLogger;internal function XrayLog ();public function debug (message:String, ...rest) : void;public function info (message:String, ...rest) : void;public function warn (message:String, ...rest) : void;public function error (message:String, ...rest) : void;public function fatal (message:String, ...rest) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\XrayLogger.as
+package com.blitzagency.xray.logger{import flash.events.EventDispatcher;import com.blitzagency.xray.logger.Debug;import com.blitzagency.xray.logger.Logger;import com.blitzagency.xray.logger.Log;import com.blitzagency.xray.logger.util.PropertyTools;import com.blitzagency.xray.logger.util.ObjectTools;import flash.utils.*;import flash.events.KeyboardEvent;/**
+* @author John Grden
+*/
+public class XrayLogger extends EventDispatcher implements Logger{public static var DEBUG : Number;public static var INFO : Number;public static var WARN : Number;public static var ERROR : Number;public static var FATAL : Number;public static var NONE : Number;private static var _instance : XrayLogger;private var level : Number;private var displayObjectRecursionDepth : Number;private var objectRecursionDepth : Number;private var indentation : Number;private var filters : Array;public static function resolveLevelAsName (p_level:Number) : String;public static function getInstance () : XrayLogger;public function setDisplayClipRecursionDepth (p_recursionDepth:Number) : void;public function setObjectRecursionDepth (p_recursionDepth:Number) : void;public function setIndentation (p_indentation:Number = 0) : void;public function setLevel (p_level:Number = 0) : void;public function setFilters (p_filters:Array) : void;public function debug (obj:Log) : void;public function info (obj:Log) : void;public function warn (obj:Log) : void;public function error (obj:Log) : void;public function fatal (obj:Log) : void;/**
+* Logs the {@code message} using the {@code Debug.trace} method if		 * {@code traceObject} is turned off or if the {@code message} is of type		 * {@code "string"}, {@code "number"}, {@code "boolean"}, {@code "undefined"} or		 * {@code "null"} and using the {@code Debug.traceObject} method if neither of the		 * above cases holds {@code true}.		 *		 * @param message the message to log
+*/
+public function log (message:String, caller:String, classPackage:String, level:Number, dump:Object = null) : void;public function checkFilters () : Boolean;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\events\DebugDispatcher.as
+package com.blitzagency.xray.logger.events{import flash.events.Event;import flash.events.EventDispatcher;import com.blitzagency.xray.logger.events.DebugEvent;public class DebugDispatcher extends EventDispatcher{public static var TRACE : String;public function sendEvent (eventName:String, obj:Object) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\events\DebugEvent.as
+package com.blitzagency.xray.logger.events{import flash.events.Event;public class DebugEvent extends Event{public var obj : Object;public function DebugEvent (type:String, bubbles:Boolean, cancelable:Boolean, p_obj:Object);}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\util\ObjectTools.as
+package com.blitzagency.xray.logger.util{import flash.utils.*;import com.blitzagency.xray.logger.XrayLog;public class ObjectTools{private static var log : XrayLog;public static function getFullClassPath (obj:Object) : String;public static function getImmediateClassPath (obj:Object) : String;public function resolveBaseType (obj:Object) : String;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\util\PropertyTools.as
+package com.blitzagency.xray.logger.util{import flash.utils.*;public class PropertyTools{public static function getProperties (obj:Object) : Array;private static function getVariables () : void;private static function getMethods () : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\util\LSOUserPreferences.as
+package com.blitzagency.xray.util{import flash.net.SharedObject;import mx.core.Application;public class LSOUserPreferences{public static var app : Object;public static var loaded : Boolean;public static var persistent : Boolean;private static var preferences : Object;private static var storedObject : SharedObject;public static function getPreference (p_key:String) : *;public static function getAllPreferences () : Object;public static function setPreference (p_key:String, p_value:Object, p_persistent:Boolean) : void;public static function load (p_path:String) : void;public static function clear () : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\edgeDetSobel_extern\edge_detection.as
+internal var myGausianFilter : ConvolutionFilter;internal var ourData : BitmapData;internal var ourEdgeData : BitmapData;internal function findEdges (myLinkage:String) : void;internal function getGray (pixelValue:uint) : uint;
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\flashandmath\bitmaps\BitmapTransformer.as
+package com.flashandmath.bitmaps{import flash.display.*;import flash.geom.Matrix;import flash.geom.Point;public class BitmapTransformer{private var dataWidth : Number;private var dataHeight : Number;private var vertsArray : Array;private var newVertsArray : Array;private var hDiv : int;private var vDiv : int;/**
+The public property 'smoothOn' should be used with caution. By default		it is set to false. When 'smoothOn' is set to 'true', ASVM will try		to 'smooth' images before rendering them. If you have more than a couple		of images, like for example in our cube menu, smoothing		may cause slight delays and jerkiness in rotation.
+*/
+public var smoothOn : Boolean;/**
+The class constructor takes as parameters the width and the height (w and h)		of the BitmapData objects to which mapBitmapData method will be applied. 		One instance of BitmapTransformer can manipulate more than one BitmapData object,		but all of them have to have the same dimensions. The optional parameters,		hdiv, vdiv control the number of subdivisions of a rectangular bitmap		horizontally and vertically. Clearly, the higher values, the better picture.		In our cube menu we use 10, 10. 5 and 5 usually suffice for good results.
+*/
+public function BitmapTransformer (w:Number, h:Number, hdiv:int = 5, vdiv:int = 5);/**
+The next function sets a hDiv by vDiv mesh of vertices over a rectangular BitampData		object of dimensions dataWidth by dataHeight. Values for hDiv, vDiv, dataWidth, dataHeight		set by the constructor based on the parameters.
+*/
+private function setVertices () : void;/**
+The next function calculates the corresponding vertices in a distorted		object. It will be used by the public mapBitmapData method.
+*/
+private function calcNewVerts (a:Point, b:Point, c:Point, d:Point) : void;/**
+The main method of the class, mapBitmapData, takes a BitmapData object of the dimensions		set by the constructor and maps it onto an arbitrary quadrangle. The method does it by		splitting each subrectangle of the distorted mesh into two triangles, and filling		each triangle with the distorted portion of the bitmap via beginBitmapFill. To use		beginBitmapFill, we need to draw the distorted triangle in some target container		in which the distorted bitmap will eventually reside. In our cube menu, each side		resides in a Sprite, side0, side1,...,side5. So for each side we draw in the corresponding		Sprite, side0, side1, and so on. 				The method takes the following parameters: a BitmapData object, Points that represent		vertices of the distortion quadrangle in a specific order: top-left, top-right,		bottom-right, bottom-left. The last parameter is the target object where drawing will take place.		It can be a Sprite, a Shape, or a MovieClip, depending on your application.				The reason why all of this works is that beginBitmapFill method takes a transform matrix as a possible		parameter. Any three points can be mapped onto any three points using an affine transformation;		that is, using a transform matrix. (Three yes, four no.) In the method's body,		we calculate the right transform matrix to apply to our bitmap at each step based on the positions of		the vertices of the original and of the distorted triangles.
+*/
+public function mapBitmapData (bd:BitmapData, topl:Point, topr:Point, botr:Point, botl:Point, cont:*) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\com\quasimondo\bitmapdata\CameraBitmap.as
+package com.quasimondo.bitmapdata{import flash.display.Bitmap;import flash.display.BitmapData;import flash.events.Event;import flash.events.EventDispatcher;import flash.events.TimerEvent;import flash.filters.ColorMatrixFilter;import flash.geom.ColorTransform;import flash.geom.Matrix;import flash.geom.Point;import flash.media.Camera;import flash.media.Video;import flash.utils.Timer;import flash.utils.setTimeout;public class CameraBitmap extends EventDispatcher{public var bitmapData : BitmapData;private var __width : int;private var __height : int;private var __cam : Camera;private var __video : Video;private var __refreshRate : int;private var __timer : Timer;private var __paintMatrix : Matrix;private var __smooth : Boolean;private var __colorTransform : ColorTransform;private var __colorMatrix : Array;private var __colorMatrixFilter : ColorMatrixFilter;private const CAMERA_DELAY : int;private const origin : Point;public function set active (value:Boolean) : Void;public function set refreshRate (value:int) : Void;public function set cameraColorTransform (value:ColorTransform) : Void;public function set colorMatrix (value:Array) : Void;public function CameraBitmap (width:int, height:int, refreshRate:int = 15, cameraWidth:int = -1, cameraHeight:int = -1);public function close () : void;private function cameraInit () : void;private function paint (event:TimerEvent = null) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZip.as
+package deng.fzip{import flash.events.*;import flash.net.URLRequest;import flash.net.URLStream;import flash.text.*;import flash.utils.*;/**
+* Loads and parses ZIP archives.	 * 	 * <p>FZip is able to process, create and modify standard ZIP archives as described in the	 * <a href="http://www.pkware.com/business_and_developers/developer/popups/appnote.txt">PKZIP file format documentation</a>.</p>	 * 	 * <p>Limitations:</p>	 * <ul>	 * <li>ZIP feature versions &gt; 2.0 are not supported</li>	 * <li>ZIP archives containing data descriptor records are not supported.</li>	 * <li>If running in the Flash Player browser plugin, FZip requires ZIPs to be 	 * patched (Adler32 checksums need to be added). This is not required if	 * FZip runs in the Adobe AIR runtime or if files contained in the ZIP 	 * are not compressed.</li>	 * </ul>
+*/
+public class FZip extends EventDispatcher{private var filesList : Array;private var filesDict : Dictionary;private var urlStream : URLStream;private var charEncoding : String;private var parseFunc : Function;private var currentFile : FZipFile;/**
+* Indicates whether a file is currently being processed or not.
+*/
+public function get active () : Boolean;/**
+* Constructor		 * 		 * @param filenameEncoding The character encoding used for filenames		 * contained in the zip. If unspecified, unicode ("utf-8") is used.		 * Older zips commonly use encoding "IBM437" (aka "cp437"),		 * while other European countries use "ibm850".		 * @see http://livedocs.adobe.com/labs/as3preview/langref/charset-codes.html
+*/
+public function FZip (filenameEncoding:String = "utf-8");/**
+* Begins downloading the ZIP archive specified by the request		 * parameter.		 * 		 * @param request A URLRequest object specifying the URL of a ZIP archive		 * to download. 		 * If the value of this parameter or the URLRequest.url property 		 * of the URLRequest object passed are null, Flash Player throws 		 * a null pointer error.
+*/
+public function load (request:URLRequest) : void;/**
+* Loads a ZIP archive from a ByteArray.		 *		 * @param bytes The ByteArray containing the ZIP archive
+*/
+public function loadBytes (bytes:ByteArray) : void;/**
+* Immediately closes the stream and cancels the download operation.		 * Files contained in the ZIP archive being loaded stay accessible		 * through the getFileAt() and getFileByName() methods.
+*/
+public function close () : void;/**
+* Serializes this zip archive into an IDataOutput stream (such as 		 * ByteArray or FileStream) according to PKZIP APPNOTE.TXT		 * 		 * @param stream The stream to serialize the zip file into.		 * @param includeAdler32 To decompress compressed files, FZip needs Adler32		 * 		checksums to be injected into the zipped files. FZip will do that 		 * 		automatically if includeAdler32 is set to true. Note that if the		 * 		ZIP contains a lot of files, or big files, the calculation of the		 * 		checksums may take a while.
+*/
+public function serialize (stream:IDataOutput, includeAdler32:Boolean = false) : void;/**
+* Gets the number of accessible files in the ZIP archive.		 * 		 * @return The number of files
+*/
+public function getFileCount () : uint;/**
+* Retrieves a file contained in the ZIP archive, by index.		 * 		 * @param index The index of the file to retrieve		 * @return A reference to a FZipFile object
+*/
+public function getFileAt (index:uint) : FZipFile;/**
+* Retrieves a file contained in the ZIP archive, by filename.		 * 		 * @param name The filename of the file to retrieve		 * @return A reference to a FZipFile object
+*/
+public function getFileByName (name:String) : FZipFile;/**
+* Adds a file to the ZIP archive.		 * 		 * @param name The filename		 * @param content The ByteArray containing the uncompressed data (pass <code>null</code> to add a folder)		 * @return A reference to the newly created FZipFile object
+*/
+public function addFile (name:String, content:ByteArray = null) : FZipFile;/**
+* Adds a file from a String to the ZIP archive.		 * 		 * @param name The filename		 * @param content The String		 * @param charset The character set		 * @return A reference to the newly created FZipFile object
+*/
+public function addFileFromString (name:String, content:String, charset:String = "utf-8") : FZipFile;/**
+* Adds a file to the ZIP archive, at a specified index.		 * 		 * @param index The index		 * @param name The filename		 * @param content The ByteArray containing the uncompressed data (pass <code>null</code> to add a folder)		 * @return A reference to the newly created FZipFile object
+*/
+public function addFileAt (index:uint, name:String, content:ByteArray = null) : FZipFile;/**
+* Adds a file from a String to the ZIP archive, at a specified index.		 * 		 * @param index The index		 * @param name The filename		 * @param content The String		 * @param charset The character set		 * @return A reference to the newly created FZipFile object
+*/
+public function addFileFromStringAt (index:uint, name:String, content:String, charset:String = "utf-8") : FZipFile;/**
+* Removes a file at a specified index from the ZIP archive.		 * 		 * @param index The index		 * @return A reference to the removed FZipFile object
+*/
+public function removeFileAt (index:uint) : FZipFile;/**
+* @private
+*/
+protected function parse (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseIdle (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseSignature (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseLocalfile (stream:IDataInput) : Boolean;/**
+* @private
+*/
+protected function progressHandler (evt:Event) : void;/**
+* @private
+*/
+protected function defaultHandler (evt:Event) : void;/**
+* @private
+*/
+protected function defaultErrorHandler (evt:Event) : void;/**
+* @private
+*/
+protected function addEventHandlers () : void;/**
+* @private
+*/
+protected function removeEventHandlers () : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipErrorEvent.as
+package deng.fzip{import flash.events.Event;/**
+* FZip dispatches FZipErrorEvent objects when it encounters 	 * errors while parsing the ZIP archive. There is only one type 	 * of FZipErrorEvent: FZipErrorEvent.PARSE_ERROR
+*/
+public class FZipErrorEvent extends Event{/**
+* A human readable description of the kind of parse error.
+*/
+public var text : String;/**
+* Defines the value of the type property of a FZipErrorEvent object.
+*/
+public static const PARSE_ERROR : String;/**
+* Constructor		 * 		 * @param type The type of the event. Event listeners can 		 * access this information through the inherited type property. 		 * There is only one type of FZipErrorEvent: 		 * FZipErrorEvent.PARSE_ERROR.		 * 		 * @param text A human readable description of the kind of parse 		 * error.		 * 		 * @param bubbles Determines whether the Event object participates 		 * in the bubbling stage of the event flow. Event listeners can 		 * access this information through the inherited bubbles property.		 * 		 * @param cancelable Determines whether the Event object can be 		 * canceled. Event listeners can access this information through 		 * the inherited cancelable property.
+*/
+public function FZipErrorEvent (type:String, text:String = "", bubbles:Boolean = false, cancelable:Boolean = false);/**
+* Creates a copy of the FZipErrorEvent object and sets the value 		 * of each property to match that of the original.		 * 		 * @return A new FZipErrorEvent object with property values that 		 * match those of the original.
+*/
+public function clone () : Event;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipEvent.as
+package deng.fzip{import deng.fzip.FZipFile;import flash.events.Event;/**
+* FZip dispatches FZipEvent objects when a file contained in the	 * ZIP archive has finished loading and can be accessed. There is 	 * only one type of FZipEvent: FZipErrorEvent.FILE_LOADED.
+*/
+public class FZipEvent extends Event{/**
+* The file that has finished loading.
+*/
+public var file : FZipFile;/**
+* Defines the value of the type property of a FZipEvent object.
+*/
+public static const FILE_LOADED : String;/**
+* Constructor		 * 		 * @param type The type of the event. Event listeners can 		 * access this information through the inherited type property. 		 * There is only one type of FZipEvent: 		 * FZipEvent.PARSE_ERROR.		 * 		 * @param file The file that has finished loading.		 * 		 * @param bubbles Determines whether the Event object participates 		 * in the bubbling stage of the event flow. Event listeners can 		 * access this information through the inherited bubbles property.		 * 		 * @param cancelable Determines whether the Event object can be 		 * canceled. Event listeners can access this information through 		 * the inherited cancelable property.
+*/
+public function FZipEvent (type:String, file:FZipFile = null, bubbles:Boolean = false, cancelable:Boolean = false);/**
+* Creates a copy of the FZipEvent object and sets the value 		 * of each property to match that of the original.		 * 		 * @return A new FZipEvent object with property values that 		 * match those of the original.
+*/
+public function clone () : Event;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipFile.as
+package deng.fzip{import deng.utils.ChecksumUtil;import flash.utils.*;/**
+* Represents a file contained in a ZIP archive.
+*/
+public class FZipFile{private var _versionHost : int;private var _versionNumber : String;private var _compressionMethod : int;private var _encrypted : Boolean;private var _implodeDictSize : int;private var _implodeShannonFanoTrees : int;private var _deflateSpeedOption : int;private var _hasDataDescriptor : Boolean;private var _hasCompressedPatchedData : Boolean;private var _date : Date;private var _crc32 : uint;private var _adler32 : uint;private var _hasAdler32 : Boolean;private var _sizeCompressed : uint;private var _sizeUncompressed : uint;private var _sizeFilename : uint;private var _sizeExtra : uint;private var _filename : String;private var _filenameEncoding : String;private var _extraFields : Dictionary;private var _comment : String;private var _content : ByteArray;private var isCompressed : Boolean;private var parseFunc : Function;/**
+* @private
+*/
+public static const COMPRESSION_NONE : int;/**
+* @private
+*/
+public static const COMPRESSION_SHRUNK : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_1 : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_2 : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_3 : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_4 : int;/**
+* @private
+*/
+public static const COMPRESSION_IMPLODED : int;/**
+* @private
+*/
+public static const COMPRESSION_TOKENIZED : int;/**
+* @private
+*/
+public static const COMPRESSION_DEFLATED : int;/**
+* @private
+*/
+public static const COMPRESSION_DEFLATED_EXT : int;/**
+* @private
+*/
+public static const COMPRESSION_IMPLODED_PKWARE : int;/**
+* @private
+*/
+private static var HAS_INFLATE : Boolean;/**
+* The Date and time the file was created.
+*/
+public function get date () : Date;public function set date (value:Date) : Void;/**
+* The file name (including relative path).
+*/
+public function get filename () : String;public function set filename (value:String) : Void;/**
+* The raw, uncompressed file.
+*/
+public function get content () : ByteArray;public function set content (data:ByteArray) : Void;/**
+* The ZIP specification version supported by the software 		 * used to encode the file.
+*/
+public function get versionNumber () : String;/**
+* The size of the compressed file (in bytes).
+*/
+public function get sizeCompressed () : uint;/**
+* The size of the uncompressed file (in bytes).
+*/
+public function get sizeUncompressed () : uint;/**
+* Constructor
+*/
+public function FZipFile (filenameEncoding:String = "utf-8");/**
+* Gets the files content as string.		 * 		 * @param recompress If <code>true</code>, the raw file content		 * is recompressed after decoding the string.		 * 		 * @param charset The character set used for decoding.		 * 		 * @return The file as string.
+*/
+public function getContentAsString (recompress:Boolean = true, charset:String = "utf-8") : String;/**
+* Sets a string as the file's content.		 * 		 * @param value The string.		 * @param charset The character set used for decoding.
+*/
+public function setContentAsString (value:String, charset:String = "utf-8") : void;/**
+* Serializes this zip archive into an IDataOutput stream (such as 		 * ByteArray or FileStream) according to PKZIP APPNOTE.TXT		 * 		 * @param stream The stream to serialize the zip archive into.		 * @param includeAdler32 If set to true, include Adler32 checksum.		 * @param centralDir If set to true, serialize a central directory entry		 * @param centralDirOffset Relative offset of local header (for central directory only).		 * 		 * @return The serialized zip file.
+*/
+public function serialize (stream:IDataOutput, includeAdler32:Boolean, centralDir:Boolean = false, centralDirOffset:uint = 0) : uint;/**
+* @private
+*/
+internal function parse (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileIdle (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileHead (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileHeadExt (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileContent (stream:IDataInput) : Boolean;/**
+* @private
+*/
+protected function parseHead (data:IDataInput) : void;/**
+* @private
+*/
+protected function parseHeadExt (data:IDataInput) : void;/**
+* @private
+*/
+protected function parseContent (data:IDataInput) : void;/**
+* @private
+*/
+protected function compress () : void;/**
+* @private
+*/
+protected function uncompress () : void;/**
+* Returns a string representation of the FZipFile object.
+*/
+public function toString () : String;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipLibrary.as
+package deng.fzip{import flash.events.*;import flash.display.Bitmap;import flash.display.BitmapData;import flash.display.DisplayObject;import flash.display.Loader;import flash.utils.ByteArray;/**
+* <p>FZipLibrary works with a FZip instance to load files as	 * usable instances, like a DisplayObject or BitmapData. Each file	 * from a loaded zip is processed based on their file extentions.	 * More than one FZip instance can be supplied, and if it is	 * currently loading files, then FZipLibrary will wait for incoming	 * files before it completes.</p>	 * 	 * <p>Flash's built-in Loader class is used to convert formats, so the	 * only formats currently supported are ones that Loader supports.	 * As of this writing they are SWF, JPEG, GIF, and PNG.</p>	 * 	 * <p>The following example loads an external zip file, outputs the	 * width and height of an image and then loads a sound from a SWF file.</p>	 * 	 * <pre>	 * package {	 * 	import flash.events.*;	 * 	import flash.display.BitmapData;	 * 	import deng.fzip.FZip;	 * 	import deng.fzip.FZipLibrary;	 * 		 * 	public class Example {	 * 		private var lib:FZipLibrary;	 * 			 * 		public function Example(url:String) {	 * 			lib = new FZipLibrary();	 * 			lib.formatAsBitmapData(".gif");	 * 			lib.formatAsBitmapData(".jpg");	 * 			lib.formatAsBitmapData(".png");	 * 			lib.formatAsDisplayObject(".swf");	 * 			lib.addEventListener(Event.COMPLETE,onLoad);	 * 				 * 			var zip:FZip = new FZip();	 * 			zip.load(url);	 * 			lib.addZip(zip);	 * 		}	 * 		private function onLoad(evt:Event) {	 * 			var image:BitmapData = lib.getBitmapData("test.png");	 * 			trace("Size: " + image.width + "x" + image.height);	 * 				 * 			var importedSound:Class = lib.getDefinition("data.swf", "SoundClass") as Class;	 * 			var snd:Sound = new importedSound() as Sound;	 * 		}	 * 	}	 * }</pre>	 * 	 * @see http://livedocs.macromedia.com/flex/201/langref/flash/display/Loader.html
+*/
+public class FZipLibrary extends EventDispatcher{private static const FORMAT_BITMAPDATA : uint;private static const FORMAT_DISPLAYOBJECT : uint;private var pendingFiles : Array;private var pendingZips : Array;private var currentState : uint;private var currentFilename : String;private var currentZip : FZip;private var currentLoader : Loader;private var bitmapDataFormat : RegExp;private var displayObjectFormat : RegExp;private var bitmapDataList : Object;private var displayObjectList : Object;/**
+* Constructor
+*/
+public function FZipLibrary ();/**
+* Use this method to add an FZip instance to the processing queue.		 * If the FZip instance specified is not active (currently receiving files)		 * when it is processed than only the files already loaded will be processed.		 * 		 * @param zip An FZip instance to process
+*/
+public function addZip (zip:FZip) : void;/**
+* Used to indicate a file extension that triggers formatting to BitmapData.		 * 		 * @param ext A file extension (".jpg", ".png", etc)
+*/
+public function formatAsBitmapData (ext:String) : void;/**
+* Used to indicate a file extension that triggers formatting to DisplayObject.		 * 		 * @param ext A file extension (".swf", ".png", etc)
+*/
+public function formatAsDisplayObject (ext:String) : void;/**
+* @private
+*/
+private function addExtension (original:RegExp, ext:String) : RegExp;/**
+* Request a file that has been formatted as BitmapData.		 * A ReferenceError is thrown if the file does not exist as a		 * BitmapData.		 * 		 * @param filename The filename of the BitmapData instance.
+*/
+public function getBitmapData (filename:String) : BitmapData;/**
+* Request a file that has been formatted as a DisplayObject.		 * A ReferenceError is thrown if the file does not exist as a		 * DisplayObject.		 * 		 * @param filename The filename of the DisplayObject instance.
+*/
+public function getDisplayObject (filename:String) : DisplayObject;/**
+* Retrieve a definition (like a class) from a SWF file that has		 * been formatted as a DisplayObject.		 * A ReferenceError is thrown if the file does not exist as a		 * DisplayObject, or the definition does not exist.		 * 		 * @param filename The filename of the DisplayObject instance.
+*/
+public function getDefinition (filename:String, definition:String) : Object;/**
+* @private
+*/
+private function processNext (evt:Event = null) : void;/**
+* @private
+*/
+private function loaderCompleteHandler (evt:Event) : void;/**
+* @private
+*/
+private function fileCompleteHandler (evt:FZipEvent) : void;/**
+* @private
+*/
+private function zipCompleteHandler (evt:Event) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\deng\utils\ChecksumUtil.as
+package deng.utils{import flash.utils.ByteArray;public class ChecksumUtil{/**
+* @private
+*/
+private static var crcTable : Array;/**
+* @private
+*/
+private static function makeCRCTable () : Array;/**
+* Calculates a CRC-32 checksum over a ByteArray		 * 		 * @see http://www.w3.org/TR/PNG/#D-CRCAppendix		 * 		 * @param data 		 * @param len		 * @param start		 * @return CRC-32 checksum
+*/
+public static function CRC32 (data:ByteArray, start:uint = 0, len:uint = 0) : uint;/**
+* Calculates an Adler-32 checksum over a ByteArray		 * 		 * @see http://en.wikipedia.org/wiki/Adler-32#Example_implementation		 * 		 * @param data 		 * @param len		 * @param start		 * @return Adler-32 checksum
+*/
+public static function Adler32 (data:ByteArray, start:uint = 0, len:uint = 0) : uint;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\TweenLite.as
+package gs{import flash.display.DisplayObject;import flash.display.Sprite;import flash.events.Event;import flash.events.TimerEvent;import flash.geom.ColorTransform;import flash.utils.*;public class TweenLite{public static var version : Number;public static var killDelayedCallsTo : Function;public static var defaultEase : Function;protected static var _all : Dictionary;protected static var _curTime : uint;private static var _classInitted : Boolean;private static var _sprite : Sprite;private static var _listening : Boolean;private static var _timer : Timer;public var duration : Number;public var vars : Object;public var delay : Number;public var startTime : int;public var initTime : int;public var tweens : Array;public var target : Object;protected var _active : Boolean;protected var _subTweens : Array;protected var _hst : Boolean;protected var _hasUpdate : Boolean;protected var _isDisplayObject : Boolean;protected var _initted : Boolean;public function get active () : Boolean;public function TweenLite ($target:Object, $duration:Number, $vars:Object);public function initTweenVals ($hrp:Boolean = false, $reservedProps:String = "") : void;protected function addSubTween ($proxy:Function, $target:Object, $props:Object, $info:Object = null) : void;public static function to ($target:Object, $duration:Number, $vars:Object) : TweenLite;public static function from ($target:Object, $duration:Number, $vars:Object) : TweenLite;public static function delayedCall ($delay:Number, $onComplete:Function, $onCompleteParams:Array = null) : TweenLite;public function render ($t:uint) : void;public static function executeAll ($e:Event = null) : void;public function complete ($skipRender:Boolean = false) : void;public static function removeTween ($t:TweenLite = null) : void;public static function killTweensOf ($tg:Object = null, $complete:Boolean = false) : void;public static function killGarbage ($e:TimerEvent) : void;public static function easeOut ($t:Number, $b:Number, $c:Number, $d:Number) : Number;protected function easeProxy ($t:Number, $b:Number, $c:Number, $d:Number) : Number;public static function tintProxy ($o:Object) : void;public static function frameProxy ($o:Object) : void;public static function volumeProxy ($o:Object) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Back.as
+package gs.easing{public class Back{public static function easeIn (t:Number, b:Number, c:Number, d:Number, s:Number = 1.70158) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number, s:Number = 1.70158) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number, s:Number = 1.70158) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Bounce.as
+package gs.easing{public class Bounce{public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Circ.as
+package gs.easing{public class Circ{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Cubic.as
+package gs.easing{public class Cubic{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\CustomEase.as
+package gs.easing{public class CustomEase{public static const VERSION : Number;private static var _all : Object;private var _segments : Array;private var _name : String;public static function create ($name:String, $segments:Array) : Function;public static function byName ($name:String) : Function;public function CustomEase ($name:String, $segments:Array);public function ease ($t:Number, $b:Number, $c:Number, $d:Number) : Number;public function destroy () : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Elastic.as
+package gs.easing{public class Elastic{private static const _2PI : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number, a:Number = 0, p:Number = 0) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number, a:Number = 0, p:Number = 0) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number, a:Number = 0, p:Number = 0) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Expo.as
+package gs.easing{public class Expo{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Linear.as
+package gs.easing{public class Linear{public static function easeNone (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Quad.as
+package gs.easing{public class Quad{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Quart.as
+package gs.easing{public class Quart{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Quint.as
+package gs.easing{public class Quint{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Sine.as
+package gs.easing{public class Sine{private static const _HALF_PI : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\easing\Strong.as
+package gs.easing{public class Strong{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\gs\events\TweenEvent.as
+package gs.events{import flash.events.Event;public class TweenEvent extends Event{public static const version : Number;public static const START : String;public static const UPDATE : String;public static const COMPLETE : String;public var info : Object;public function TweenEvent ($type:String, $info:Object = null, $bubbles:Boolean = false, $cancelable:Boolean = false);public function clone () : Event;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\Feature2Rects.as
+package jp.maaash.ObjectDetection{public class Feature2Rects extends FeatureBase{public var r1 : HaarRect;public var r2 : HaarRect;public function Feature2Rects (_th:Number, _lv:Number, _rv:Number, _r1:Array, _r2:Array);public function getSum (targetImage:TargetImage, offsetx:int, offsety:int) : Number;public function setScaleAndWeight (s:Number, w:Number) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\Feature3Rects.as
+package jp.maaash.ObjectDetection{public class Feature3Rects extends FeatureBase{public var r1 : HaarRect;public var r2 : HaarRect;public var r3 : HaarRect;public function Feature3Rects (_th:Number, _lv:Number, _rv:Number, _r1:Array, _r2:Array, _r3:Array);public function getSum (targetImage:TargetImage, offsetx:int, offsety:int) : Number;public function setScaleAndWeight (s:Number, w:Number) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\FeatureBase.as
+package jp.maaash.ObjectDetection{public class FeatureBase{public var threshold : Number;public var left_val : Number;public var right_val : Number;public var next : FeatureBase;public function FeatureBase (_th:Number, _lv:Number, _rv:Number);public function getSum (targetImage:TargetImage, x:int, y:int) : Number;public function setScaleAndWeight (s:Number, w:Number) : void;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\FeatureTree.as
+package jp.maaash.ObjectDetection{public class FeatureTree{public var stage_threshold : Number;public var next : FeatureTree;public var firstFeature : FeatureBase;public function FeatureTree ($stage_threshold:Number);}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\HaarCascade.as
+package jp.maaash.ObjectDetection{import flash.geom.Rectangle;public class HaarCascade{public var base_window_w : int;public var base_window_h : int;public var inv_window_area : Number;public var trees : Array;public var targetImage : TargetImage;private var _scale : Number;private var firstTree : FeatureTree;public function set scale (s:Number) : Void;public function HaarCascade ();private function init () : void;public function run (r:Rectangle) : int;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\HaarRect.as
+package jp.maaash.ObjectDetection{public class HaarRect{public var dx : int;public var dy : int;public var dw : int;public var dh : int;public var dweight : Number;public var sx : int;public var sy : int;public var sw : int;public var sh : int;public var sweight : Number;public function get area () : int;public function set scale (s:Number) : Void;public function set scale_weight (s:Number) : Void;public function HaarRect (d:Array);}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\ObjectDetector.as
+package jp.maaash.ObjectDetection{import flash.display.Bitmap;import flash.display.BitmapData;import flash.events.EventDispatcher;import flash.geom.Rectangle;public class ObjectDetector extends EventDispatcher{private var tgt : TargetImage;public var detected : Array;public var cascade : HaarCascade;private var _options : ObjectDetectorOptions;public function set bitmap (bmp:Bitmap) : Void;public function set options (opt:ObjectDetectorOptions) : Void;public function ObjectDetector ();public function detect (bmp:BitmapData) : void;private function _detect () : void;private function overlaps (rect:Rectangle) : Boolean;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\ObjectDetectorEvent.as
+package jp.maaash.ObjectDetection{import flash.events.Event;import flash.geom.Rectangle;public class ObjectDetectorEvent extends Event{public static const DETECTION_COMPLETE : String;public static const FACE_FOUND : String;public static const DETECTION_START : String;public var rect : Rectangle;public var rects : Array;public function ObjectDetectorEvent (t:String);public function clone () : Event;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\ObjectDetectorOptions.as
+package jp.maaash.ObjectDetection{public class ObjectDetectorOptions{public static const SCALE_FACTOR : Number;public static const MIN_SIZE : int;public static const MIN_MARGIN_SEARCH : int;public static const SEARCH_MODE_DEFAULT : int;public static const SEARCH_MODE_SOLO : int;public static const SEARCH_MODE_NO_OVERLAP : int;public static const INVALID_POS : int;public var search_mode : int;public var scale_factor : Number;public var min_size : int;public var startx : int;public var starty : int;public var endx : int;public var endy : int;}}
+#file-cache C:\Users\Asus\Downloads\Compressed\collada01\collada01\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\TargetImage.as
+package jp.maaash.ObjectDetection{import flash.display.BitmapData;import flash.utils.ByteArray;public class TargetImage{public var _ii : Array;public var _ii2 : Array;public var iiw : int;public var iih : int;public var width : int;public var height : int;public function set bitmapData (b:BitmapData) : Void;public function TargetImage ();public function getSum (x:int, y:int, w:int, h:int) : int;public function getSum2 (x:int, y:int, w:int, h:int) : int;public function getII (x:int, y:int) : int;public function getII2 (x:int, y:int) : int;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\Debug.as
+package com.blitzagency.xray.logger{import flash.utils.*;import com.blitzagency.xray.logger.events.DebugDispatcher;import flash.net.LocalConnection;import flash.events.StatusEvent;/**
+Debug class for use with bit-101 Flash Debug Panel    See www.bit-101.com/DebugPanel    This work is licensed under a Creative Commons Attribution 2.5 License.    See http://creativecommons.org/licenses/by/2.5/        Authors: Keith Peters and Tim Walling    www.bit-101.com    www.timwalling.com		Modified for Xray:	John Grden	neoRiley@gmail.com	www.osflash.org/xray
+*/
+public class Debug{private static var xrayLC : LocalConnection;private static var connected : Boolean;private static var ed : DebugDispatcher;private static function initialize () : Boolean;private static function makeConnection () : void;private static function statusHandler (event:StatusEvent) : void;public static function addEventListener (type:String, listener:Function) : void;/**
+*	Traces any value to the debug panel, with an optional message level.		 *	@param pMsg The value to trace.		 *	@param pLvl Optional. The level for this message. Values are 0 through 4, or Debug.Debug, Debug.INFO, Debug.WARN, Debug.ERROR, Debug.FATAL.
+*/
+public static function trace (pMsg:Object, pPackage:String = "", pLevel:Number = 0) : void;/**
+*	Recursively traces an object's value to the debug panel.		 *	@param o The object to trace.		 *	@param pRecurseDepth Optional. How many levels deep to recursively trace. Defaults to 0, which traces only the top level value.		 *	@param pIndent Optional. Number of spaces to indent each new level of recursion.		 * 	@param pPackage - passed in via XrayLogger.  Package info sent along to Xray's interface for package filtering
+*/
+public static function traceObject (o:Object, pRecurseDepth:Number = 254, pIndent:Number = 0, pPackage:String = "", pLevel:Number = 0) : void;}internal class LogError extends Error{public function LogError (message:String);}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\Log.as
+package com.blitzagency.xray.logger{import com.blitzagency.xray.logger.XrayLogger;import com.blitzagency.xray.logger.util.ObjectTools;import com.blitzagency.xray.logger.Debug;public class Log{private var message : String;private var dump : Object;private var level : Number;private var classPackage : String;private var caller : String;/**
+* I generate an error in the constructor as to force the debugger to give me the stackTrace		* Supposedly, this won't work in the regular player, and as of 8/28/2006, I haven't tried it ;) 		*
+*/
+public function Log (p_message:String, p_dump:Object, p_level:Number, ...rest);public function setMessage (p_message:String) : void;public function setDump (p_dump:Object) : void;public function setLevel (p_level:Number) : void;public function getMessage () : String;public function getDump () : Object;public function getLevel () : Number;public function getClassPackage () : String;public function setClassPackage (obj:Object) : void;private function resolveCaller (str:String) : String;public function setCaller (p_caller:String) : void;public function getCaller () : String;}internal class LogError extends Error{public function LogError (message:String);}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\Logger.as
+package com.blitzagency.xray.logger{import com.blitzagency.xray.logger.Log;public interface Logger{public function setLevel (p_level:Number = 0) : void;public function debug (obj:Log) : void;public function info (obj:Log) : void;public function warn (obj:Log) : void;public function error (obj:Log) : void;public function fatal (obj:Log) : void;public function log (message:String, caller:String, classPackage:String, level:Number, dump:Object = null) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\XrayLog.as
+package com.blitzagency.xray.logger{import com.blitzagency.xray.logger.XrayLogger;import com.blitzagency.xray.logger.Log;public class XrayLog{private var logger : XrayLogger;internal function XrayLog ();public function debug (message:String, ...rest) : void;public function info (message:String, ...rest) : void;public function warn (message:String, ...rest) : void;public function error (message:String, ...rest) : void;public function fatal (message:String, ...rest) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\XrayLogger.as
+package com.blitzagency.xray.logger{import flash.events.EventDispatcher;import com.blitzagency.xray.logger.Debug;import com.blitzagency.xray.logger.Logger;import com.blitzagency.xray.logger.Log;import com.blitzagency.xray.logger.util.PropertyTools;import com.blitzagency.xray.logger.util.ObjectTools;import flash.utils.*;import flash.events.KeyboardEvent;/**
+* @author John Grden
+*/
+public class XrayLogger extends EventDispatcher implements Logger{public static var DEBUG : Number;public static var INFO : Number;public static var WARN : Number;public static var ERROR : Number;public static var FATAL : Number;public static var NONE : Number;private static var _instance : XrayLogger;private var level : Number;private var displayObjectRecursionDepth : Number;private var objectRecursionDepth : Number;private var indentation : Number;private var filters : Array;public static function resolveLevelAsName (p_level:Number) : String;public static function getInstance () : XrayLogger;public function setDisplayClipRecursionDepth (p_recursionDepth:Number) : void;public function setObjectRecursionDepth (p_recursionDepth:Number) : void;public function setIndentation (p_indentation:Number = 0) : void;public function setLevel (p_level:Number = 0) : void;public function setFilters (p_filters:Array) : void;public function debug (obj:Log) : void;public function info (obj:Log) : void;public function warn (obj:Log) : void;public function error (obj:Log) : void;public function fatal (obj:Log) : void;/**
+* Logs the {@code message} using the {@code Debug.trace} method if		 * {@code traceObject} is turned off or if the {@code message} is of type		 * {@code "string"}, {@code "number"}, {@code "boolean"}, {@code "undefined"} or		 * {@code "null"} and using the {@code Debug.traceObject} method if neither of the		 * above cases holds {@code true}.		 *		 * @param message the message to log
+*/
+public function log (message:String, caller:String, classPackage:String, level:Number, dump:Object = null) : void;public function checkFilters () : Boolean;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\events\DebugDispatcher.as
+package com.blitzagency.xray.logger.events{import flash.events.Event;import flash.events.EventDispatcher;import com.blitzagency.xray.logger.events.DebugEvent;public class DebugDispatcher extends EventDispatcher{public static var TRACE : String;public function sendEvent (eventName:String, obj:Object) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\events\DebugEvent.as
+package com.blitzagency.xray.logger.events{import flash.events.Event;public class DebugEvent extends Event{public var obj : Object;public function DebugEvent (type:String, bubbles:Boolean, cancelable:Boolean, p_obj:Object);}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\util\ObjectTools.as
+package com.blitzagency.xray.logger.util{import flash.utils.*;import com.blitzagency.xray.logger.XrayLog;public class ObjectTools{private static var log : XrayLog;public static function getFullClassPath (obj:Object) : String;public static function getImmediateClassPath (obj:Object) : String;public function resolveBaseType (obj:Object) : String;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\logger\util\PropertyTools.as
+package com.blitzagency.xray.logger.util{import flash.utils.*;public class PropertyTools{public static function getProperties (obj:Object) : Array;private static function getVariables () : void;private static function getMethods () : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\blitzagency\xray\util\LSOUserPreferences.as
+package com.blitzagency.xray.util{import flash.net.SharedObject;import mx.core.Application;public class LSOUserPreferences{public static var app : Object;public static var loaded : Boolean;public static var persistent : Boolean;private static var preferences : Object;private static var storedObject : SharedObject;public static function getPreference (p_key:String) : *;public static function getAllPreferences () : Object;public static function setPreference (p_key:String, p_value:Object, p_persistent:Boolean) : void;public static function load (p_path:String) : void;public static function clear () : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\edgeDetSobel_extern\edge_detection.as
+internal var myGausianFilter : ConvolutionFilter;internal var ourData : BitmapData;internal var ourEdgeData : BitmapData;internal function findEdges (myLinkage:String) : void;internal function getGray (pixelValue:uint) : uint;
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\flashandmath\bitmaps\BitmapTransformer.as
+package com.flashandmath.bitmaps{import flash.display.*;import flash.geom.Matrix;import flash.geom.Point;public class BitmapTransformer{private var dataWidth : Number;private var dataHeight : Number;private var vertsArray : Array;private var newVertsArray : Array;private var hDiv : int;private var vDiv : int;/**
+The public property 'smoothOn' should be used with caution. By default		it is set to false. When 'smoothOn' is set to 'true', ASVM will try		to 'smooth' images before rendering them. If you have more than a couple		of images, like for example in our cube menu, smoothing		may cause slight delays and jerkiness in rotation.
+*/
+public var smoothOn : Boolean;/**
+The class constructor takes as parameters the width and the height (w and h)		of the BitmapData objects to which mapBitmapData method will be applied. 		One instance of BitmapTransformer can manipulate more than one BitmapData object,		but all of them have to have the same dimensions. The optional parameters,		hdiv, vdiv control the number of subdivisions of a rectangular bitmap		horizontally and vertically. Clearly, the higher values, the better picture.		In our cube menu we use 10, 10. 5 and 5 usually suffice for good results.
+*/
+public function BitmapTransformer (w:Number, h:Number, hdiv:int = 5, vdiv:int = 5);/**
+The next function sets a hDiv by vDiv mesh of vertices over a rectangular BitampData		object of dimensions dataWidth by dataHeight. Values for hDiv, vDiv, dataWidth, dataHeight		set by the constructor based on the parameters.
+*/
+private function setVertices () : void;/**
+The next function calculates the corresponding vertices in a distorted		object. It will be used by the public mapBitmapData method.
+*/
+private function calcNewVerts (a:Point, b:Point, c:Point, d:Point) : void;/**
+The main method of the class, mapBitmapData, takes a BitmapData object of the dimensions		set by the constructor and maps it onto an arbitrary quadrangle. The method does it by		splitting each subrectangle of the distorted mesh into two triangles, and filling		each triangle with the distorted portion of the bitmap via beginBitmapFill. To use		beginBitmapFill, we need to draw the distorted triangle in some target container		in which the distorted bitmap will eventually reside. In our cube menu, each side		resides in a Sprite, side0, side1,...,side5. So for each side we draw in the corresponding		Sprite, side0, side1, and so on. 				The method takes the following parameters: a BitmapData object, Points that represent		vertices of the distortion quadrangle in a specific order: top-left, top-right,		bottom-right, bottom-left. The last parameter is the target object where drawing will take place.		It can be a Sprite, a Shape, or a MovieClip, depending on your application.				The reason why all of this works is that beginBitmapFill method takes a transform matrix as a possible		parameter. Any three points can be mapped onto any three points using an affine transformation;		that is, using a transform matrix. (Three yes, four no.) In the method's body,		we calculate the right transform matrix to apply to our bitmap at each step based on the positions of		the vertices of the original and of the distorted triangles.
+*/
+public function mapBitmapData (bd:BitmapData, topl:Point, topr:Point, botr:Point, botl:Point, cont:*) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\com\quasimondo\bitmapdata\CameraBitmap.as
+package com.quasimondo.bitmapdata{import flash.display.Bitmap;import flash.display.BitmapData;import flash.events.Event;import flash.events.EventDispatcher;import flash.events.TimerEvent;import flash.filters.ColorMatrixFilter;import flash.geom.ColorTransform;import flash.geom.Matrix;import flash.geom.Point;import flash.media.Camera;import flash.media.Video;import flash.utils.Timer;import flash.utils.setTimeout;public class CameraBitmap extends EventDispatcher{public var bitmapData : BitmapData;private var __width : int;private var __height : int;private var __cam : Camera;private var __video : Video;private var __refreshRate : int;private var __timer : Timer;private var __paintMatrix : Matrix;private var __smooth : Boolean;private var __colorTransform : ColorTransform;private var __colorMatrix : Array;private var __colorMatrixFilter : ColorMatrixFilter;private const CAMERA_DELAY : int;private const origin : Point;public function set active (value:Boolean) : Void;public function set refreshRate (value:int) : Void;public function set cameraColorTransform (value:ColorTransform) : Void;public function set colorMatrix (value:Array) : Void;public function CameraBitmap (width:int, height:int, refreshRate:int = 15, cameraWidth:int = -1, cameraHeight:int = -1);public function close () : void;private function cameraInit () : void;private function paint (event:TimerEvent = null) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZip.as
+package deng.fzip{import flash.events.*;import flash.net.URLRequest;import flash.net.URLStream;import flash.text.*;import flash.utils.*;/**
+* Loads and parses ZIP archives.	 * 	 * <p>FZip is able to process, create and modify standard ZIP archives as described in the	 * <a href="http://www.pkware.com/business_and_developers/developer/popups/appnote.txt">PKZIP file format documentation</a>.</p>	 * 	 * <p>Limitations:</p>	 * <ul>	 * <li>ZIP feature versions &gt; 2.0 are not supported</li>	 * <li>ZIP archives containing data descriptor records are not supported.</li>	 * <li>If running in the Flash Player browser plugin, FZip requires ZIPs to be 	 * patched (Adler32 checksums need to be added). This is not required if	 * FZip runs in the Adobe AIR runtime or if files contained in the ZIP 	 * are not compressed.</li>	 * </ul>
+*/
+public class FZip extends EventDispatcher{private var filesList : Array;private var filesDict : Dictionary;private var urlStream : URLStream;private var charEncoding : String;private var parseFunc : Function;private var currentFile : FZipFile;/**
+* Indicates whether a file is currently being processed or not.
+*/
+public function get active () : Boolean;/**
+* Constructor		 * 		 * @param filenameEncoding The character encoding used for filenames		 * contained in the zip. If unspecified, unicode ("utf-8") is used.		 * Older zips commonly use encoding "IBM437" (aka "cp437"),		 * while other European countries use "ibm850".		 * @see http://livedocs.adobe.com/labs/as3preview/langref/charset-codes.html
+*/
+public function FZip (filenameEncoding:String = "utf-8");/**
+* Begins downloading the ZIP archive specified by the request		 * parameter.		 * 		 * @param request A URLRequest object specifying the URL of a ZIP archive		 * to download. 		 * If the value of this parameter or the URLRequest.url property 		 * of the URLRequest object passed are null, Flash Player throws 		 * a null pointer error.
+*/
+public function load (request:URLRequest) : void;/**
+* Loads a ZIP archive from a ByteArray.		 *		 * @param bytes The ByteArray containing the ZIP archive
+*/
+public function loadBytes (bytes:ByteArray) : void;/**
+* Immediately closes the stream and cancels the download operation.		 * Files contained in the ZIP archive being loaded stay accessible		 * through the getFileAt() and getFileByName() methods.
+*/
+public function close () : void;/**
+* Serializes this zip archive into an IDataOutput stream (such as 		 * ByteArray or FileStream) according to PKZIP APPNOTE.TXT		 * 		 * @param stream The stream to serialize the zip file into.		 * @param includeAdler32 To decompress compressed files, FZip needs Adler32		 * 		checksums to be injected into the zipped files. FZip will do that 		 * 		automatically if includeAdler32 is set to true. Note that if the		 * 		ZIP contains a lot of files, or big files, the calculation of the		 * 		checksums may take a while.
+*/
+public function serialize (stream:IDataOutput, includeAdler32:Boolean = false) : void;/**
+* Gets the number of accessible files in the ZIP archive.		 * 		 * @return The number of files
+*/
+public function getFileCount () : uint;/**
+* Retrieves a file contained in the ZIP archive, by index.		 * 		 * @param index The index of the file to retrieve		 * @return A reference to a FZipFile object
+*/
+public function getFileAt (index:uint) : FZipFile;/**
+* Retrieves a file contained in the ZIP archive, by filename.		 * 		 * @param name The filename of the file to retrieve		 * @return A reference to a FZipFile object
+*/
+public function getFileByName (name:String) : FZipFile;/**
+* Adds a file to the ZIP archive.		 * 		 * @param name The filename		 * @param content The ByteArray containing the uncompressed data (pass <code>null</code> to add a folder)		 * @return A reference to the newly created FZipFile object
+*/
+public function addFile (name:String, content:ByteArray = null) : FZipFile;/**
+* Adds a file from a String to the ZIP archive.		 * 		 * @param name The filename		 * @param content The String		 * @param charset The character set		 * @return A reference to the newly created FZipFile object
+*/
+public function addFileFromString (name:String, content:String, charset:String = "utf-8") : FZipFile;/**
+* Adds a file to the ZIP archive, at a specified index.		 * 		 * @param index The index		 * @param name The filename		 * @param content The ByteArray containing the uncompressed data (pass <code>null</code> to add a folder)		 * @return A reference to the newly created FZipFile object
+*/
+public function addFileAt (index:uint, name:String, content:ByteArray = null) : FZipFile;/**
+* Adds a file from a String to the ZIP archive, at a specified index.		 * 		 * @param index The index		 * @param name The filename		 * @param content The String		 * @param charset The character set		 * @return A reference to the newly created FZipFile object
+*/
+public function addFileFromStringAt (index:uint, name:String, content:String, charset:String = "utf-8") : FZipFile;/**
+* Removes a file at a specified index from the ZIP archive.		 * 		 * @param index The index		 * @return A reference to the removed FZipFile object
+*/
+public function removeFileAt (index:uint) : FZipFile;/**
+* @private
+*/
+protected function parse (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseIdle (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseSignature (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseLocalfile (stream:IDataInput) : Boolean;/**
+* @private
+*/
+protected function progressHandler (evt:Event) : void;/**
+* @private
+*/
+protected function defaultHandler (evt:Event) : void;/**
+* @private
+*/
+protected function defaultErrorHandler (evt:Event) : void;/**
+* @private
+*/
+protected function addEventHandlers () : void;/**
+* @private
+*/
+protected function removeEventHandlers () : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipErrorEvent.as
+package deng.fzip{import flash.events.Event;/**
+* FZip dispatches FZipErrorEvent objects when it encounters 	 * errors while parsing the ZIP archive. There is only one type 	 * of FZipErrorEvent: FZipErrorEvent.PARSE_ERROR
+*/
+public class FZipErrorEvent extends Event{/**
+* A human readable description of the kind of parse error.
+*/
+public var text : String;/**
+* Defines the value of the type property of a FZipErrorEvent object.
+*/
+public static const PARSE_ERROR : String;/**
+* Constructor		 * 		 * @param type The type of the event. Event listeners can 		 * access this information through the inherited type property. 		 * There is only one type of FZipErrorEvent: 		 * FZipErrorEvent.PARSE_ERROR.		 * 		 * @param text A human readable description of the kind of parse 		 * error.		 * 		 * @param bubbles Determines whether the Event object participates 		 * in the bubbling stage of the event flow. Event listeners can 		 * access this information through the inherited bubbles property.		 * 		 * @param cancelable Determines whether the Event object can be 		 * canceled. Event listeners can access this information through 		 * the inherited cancelable property.
+*/
+public function FZipErrorEvent (type:String, text:String = "", bubbles:Boolean = false, cancelable:Boolean = false);/**
+* Creates a copy of the FZipErrorEvent object and sets the value 		 * of each property to match that of the original.		 * 		 * @return A new FZipErrorEvent object with property values that 		 * match those of the original.
+*/
+public function clone () : Event;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipEvent.as
+package deng.fzip{import deng.fzip.FZipFile;import flash.events.Event;/**
+* FZip dispatches FZipEvent objects when a file contained in the	 * ZIP archive has finished loading and can be accessed. There is 	 * only one type of FZipEvent: FZipErrorEvent.FILE_LOADED.
+*/
+public class FZipEvent extends Event{/**
+* The file that has finished loading.
+*/
+public var file : FZipFile;/**
+* Defines the value of the type property of a FZipEvent object.
+*/
+public static const FILE_LOADED : String;/**
+* Constructor		 * 		 * @param type The type of the event. Event listeners can 		 * access this information through the inherited type property. 		 * There is only one type of FZipEvent: 		 * FZipEvent.PARSE_ERROR.		 * 		 * @param file The file that has finished loading.		 * 		 * @param bubbles Determines whether the Event object participates 		 * in the bubbling stage of the event flow. Event listeners can 		 * access this information through the inherited bubbles property.		 * 		 * @param cancelable Determines whether the Event object can be 		 * canceled. Event listeners can access this information through 		 * the inherited cancelable property.
+*/
+public function FZipEvent (type:String, file:FZipFile = null, bubbles:Boolean = false, cancelable:Boolean = false);/**
+* Creates a copy of the FZipEvent object and sets the value 		 * of each property to match that of the original.		 * 		 * @return A new FZipEvent object with property values that 		 * match those of the original.
+*/
+public function clone () : Event;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipFile.as
+package deng.fzip{import deng.utils.ChecksumUtil;import flash.utils.*;/**
+* Represents a file contained in a ZIP archive.
+*/
+public class FZipFile{private var _versionHost : int;private var _versionNumber : String;private var _compressionMethod : int;private var _encrypted : Boolean;private var _implodeDictSize : int;private var _implodeShannonFanoTrees : int;private var _deflateSpeedOption : int;private var _hasDataDescriptor : Boolean;private var _hasCompressedPatchedData : Boolean;private var _date : Date;private var _crc32 : uint;private var _adler32 : uint;private var _hasAdler32 : Boolean;private var _sizeCompressed : uint;private var _sizeUncompressed : uint;private var _sizeFilename : uint;private var _sizeExtra : uint;private var _filename : String;private var _filenameEncoding : String;private var _extraFields : Dictionary;private var _comment : String;private var _content : ByteArray;private var isCompressed : Boolean;private var parseFunc : Function;/**
+* @private
+*/
+public static const COMPRESSION_NONE : int;/**
+* @private
+*/
+public static const COMPRESSION_SHRUNK : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_1 : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_2 : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_3 : int;/**
+* @private
+*/
+public static const COMPRESSION_REDUCED_4 : int;/**
+* @private
+*/
+public static const COMPRESSION_IMPLODED : int;/**
+* @private
+*/
+public static const COMPRESSION_TOKENIZED : int;/**
+* @private
+*/
+public static const COMPRESSION_DEFLATED : int;/**
+* @private
+*/
+public static const COMPRESSION_DEFLATED_EXT : int;/**
+* @private
+*/
+public static const COMPRESSION_IMPLODED_PKWARE : int;/**
+* @private
+*/
+private static var HAS_INFLATE : Boolean;/**
+* The Date and time the file was created.
+*/
+public function get date () : Date;public function set date (value:Date) : Void;/**
+* The file name (including relative path).
+*/
+public function get filename () : String;public function set filename (value:String) : Void;/**
+* The raw, uncompressed file.
+*/
+public function get content () : ByteArray;public function set content (data:ByteArray) : Void;/**
+* The ZIP specification version supported by the software 		 * used to encode the file.
+*/
+public function get versionNumber () : String;/**
+* The size of the compressed file (in bytes).
+*/
+public function get sizeCompressed () : uint;/**
+* The size of the uncompressed file (in bytes).
+*/
+public function get sizeUncompressed () : uint;/**
+* Constructor
+*/
+public function FZipFile (filenameEncoding:String = "utf-8");/**
+* Gets the files content as string.		 * 		 * @param recompress If <code>true</code>, the raw file content		 * is recompressed after decoding the string.		 * 		 * @param charset The character set used for decoding.		 * 		 * @return The file as string.
+*/
+public function getContentAsString (recompress:Boolean = true, charset:String = "utf-8") : String;/**
+* Sets a string as the file's content.		 * 		 * @param value The string.		 * @param charset The character set used for decoding.
+*/
+public function setContentAsString (value:String, charset:String = "utf-8") : void;/**
+* Serializes this zip archive into an IDataOutput stream (such as 		 * ByteArray or FileStream) according to PKZIP APPNOTE.TXT		 * 		 * @param stream The stream to serialize the zip archive into.		 * @param includeAdler32 If set to true, include Adler32 checksum.		 * @param centralDir If set to true, serialize a central directory entry		 * @param centralDirOffset Relative offset of local header (for central directory only).		 * 		 * @return The serialized zip file.
+*/
+public function serialize (stream:IDataOutput, includeAdler32:Boolean, centralDir:Boolean = false, centralDirOffset:uint = 0) : uint;/**
+* @private
+*/
+internal function parse (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileIdle (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileHead (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileHeadExt (stream:IDataInput) : Boolean;/**
+* @private
+*/
+private function parseFileContent (stream:IDataInput) : Boolean;/**
+* @private
+*/
+protected function parseHead (data:IDataInput) : void;/**
+* @private
+*/
+protected function parseHeadExt (data:IDataInput) : void;/**
+* @private
+*/
+protected function parseContent (data:IDataInput) : void;/**
+* @private
+*/
+protected function compress () : void;/**
+* @private
+*/
+protected function uncompress () : void;/**
+* Returns a string representation of the FZipFile object.
+*/
+public function toString () : String;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\deng\fzip\FZipLibrary.as
+package deng.fzip{import flash.events.*;import flash.display.Bitmap;import flash.display.BitmapData;import flash.display.DisplayObject;import flash.display.Loader;import flash.utils.ByteArray;/**
+* <p>FZipLibrary works with a FZip instance to load files as	 * usable instances, like a DisplayObject or BitmapData. Each file	 * from a loaded zip is processed based on their file extentions.	 * More than one FZip instance can be supplied, and if it is	 * currently loading files, then FZipLibrary will wait for incoming	 * files before it completes.</p>	 * 	 * <p>Flash's built-in Loader class is used to convert formats, so the	 * only formats currently supported are ones that Loader supports.	 * As of this writing they are SWF, JPEG, GIF, and PNG.</p>	 * 	 * <p>The following example loads an external zip file, outputs the	 * width and height of an image and then loads a sound from a SWF file.</p>	 * 	 * <pre>	 * package {	 * 	import flash.events.*;	 * 	import flash.display.BitmapData;	 * 	import deng.fzip.FZip;	 * 	import deng.fzip.FZipLibrary;	 * 		 * 	public class Example {	 * 		private var lib:FZipLibrary;	 * 			 * 		public function Example(url:String) {	 * 			lib = new FZipLibrary();	 * 			lib.formatAsBitmapData(".gif");	 * 			lib.formatAsBitmapData(".jpg");	 * 			lib.formatAsBitmapData(".png");	 * 			lib.formatAsDisplayObject(".swf");	 * 			lib.addEventListener(Event.COMPLETE,onLoad);	 * 				 * 			var zip:FZip = new FZip();	 * 			zip.load(url);	 * 			lib.addZip(zip);	 * 		}	 * 		private function onLoad(evt:Event) {	 * 			var image:BitmapData = lib.getBitmapData("test.png");	 * 			trace("Size: " + image.width + "x" + image.height);	 * 				 * 			var importedSound:Class = lib.getDefinition("data.swf", "SoundClass") as Class;	 * 			var snd:Sound = new importedSound() as Sound;	 * 		}	 * 	}	 * }</pre>	 * 	 * @see http://livedocs.macromedia.com/flex/201/langref/flash/display/Loader.html
+*/
+public class FZipLibrary extends EventDispatcher{private static const FORMAT_BITMAPDATA : uint;private static const FORMAT_DISPLAYOBJECT : uint;private var pendingFiles : Array;private var pendingZips : Array;private var currentState : uint;private var currentFilename : String;private var currentZip : FZip;private var currentLoader : Loader;private var bitmapDataFormat : RegExp;private var displayObjectFormat : RegExp;private var bitmapDataList : Object;private var displayObjectList : Object;/**
+* Constructor
+*/
+public function FZipLibrary ();/**
+* Use this method to add an FZip instance to the processing queue.		 * If the FZip instance specified is not active (currently receiving files)		 * when it is processed than only the files already loaded will be processed.		 * 		 * @param zip An FZip instance to process
+*/
+public function addZip (zip:FZip) : void;/**
+* Used to indicate a file extension that triggers formatting to BitmapData.		 * 		 * @param ext A file extension (".jpg", ".png", etc)
+*/
+public function formatAsBitmapData (ext:String) : void;/**
+* Used to indicate a file extension that triggers formatting to DisplayObject.		 * 		 * @param ext A file extension (".swf", ".png", etc)
+*/
+public function formatAsDisplayObject (ext:String) : void;/**
+* @private
+*/
+private function addExtension (original:RegExp, ext:String) : RegExp;/**
+* Request a file that has been formatted as BitmapData.		 * A ReferenceError is thrown if the file does not exist as a		 * BitmapData.		 * 		 * @param filename The filename of the BitmapData instance.
+*/
+public function getBitmapData (filename:String) : BitmapData;/**
+* Request a file that has been formatted as a DisplayObject.		 * A ReferenceError is thrown if the file does not exist as a		 * DisplayObject.		 * 		 * @param filename The filename of the DisplayObject instance.
+*/
+public function getDisplayObject (filename:String) : DisplayObject;/**
+* Retrieve a definition (like a class) from a SWF file that has		 * been formatted as a DisplayObject.		 * A ReferenceError is thrown if the file does not exist as a		 * DisplayObject, or the definition does not exist.		 * 		 * @param filename The filename of the DisplayObject instance.
+*/
+public function getDefinition (filename:String, definition:String) : Object;/**
+* @private
+*/
+private function processNext (evt:Event = null) : void;/**
+* @private
+*/
+private function loaderCompleteHandler (evt:Event) : void;/**
+* @private
+*/
+private function fileCompleteHandler (evt:FZipEvent) : void;/**
+* @private
+*/
+private function zipCompleteHandler (evt:Event) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\deng\utils\ChecksumUtil.as
+package deng.utils{import flash.utils.ByteArray;public class ChecksumUtil{/**
+* @private
+*/
+private static var crcTable : Array;/**
+* @private
+*/
+private static function makeCRCTable () : Array;/**
+* Calculates a CRC-32 checksum over a ByteArray		 * 		 * @see http://www.w3.org/TR/PNG/#D-CRCAppendix		 * 		 * @param data 		 * @param len		 * @param start		 * @return CRC-32 checksum
+*/
+public static function CRC32 (data:ByteArray, start:uint = 0, len:uint = 0) : uint;/**
+* Calculates an Adler-32 checksum over a ByteArray		 * 		 * @see http://en.wikipedia.org/wiki/Adler-32#Example_implementation		 * 		 * @param data 		 * @param len		 * @param start		 * @return Adler-32 checksum
+*/
+public static function Adler32 (data:ByteArray, start:uint = 0, len:uint = 0) : uint;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\TweenLite.as
+package gs{import flash.display.DisplayObject;import flash.display.Sprite;import flash.events.Event;import flash.events.TimerEvent;import flash.geom.ColorTransform;import flash.utils.*;public class TweenLite{public static var version : Number;public static var killDelayedCallsTo : Function;public static var defaultEase : Function;protected static var _all : Dictionary;protected static var _curTime : uint;private static var _classInitted : Boolean;private static var _sprite : Sprite;private static var _listening : Boolean;private static var _timer : Timer;public var duration : Number;public var vars : Object;public var delay : Number;public var startTime : int;public var initTime : int;public var tweens : Array;public var target : Object;protected var _active : Boolean;protected var _subTweens : Array;protected var _hst : Boolean;protected var _hasUpdate : Boolean;protected var _isDisplayObject : Boolean;protected var _initted : Boolean;public function get active () : Boolean;public function TweenLite ($target:Object, $duration:Number, $vars:Object);public function initTweenVals ($hrp:Boolean = false, $reservedProps:String = "") : void;protected function addSubTween ($proxy:Function, $target:Object, $props:Object, $info:Object = null) : void;public static function to ($target:Object, $duration:Number, $vars:Object) : TweenLite;public static function from ($target:Object, $duration:Number, $vars:Object) : TweenLite;public static function delayedCall ($delay:Number, $onComplete:Function, $onCompleteParams:Array = null) : TweenLite;public function render ($t:uint) : void;public static function executeAll ($e:Event = null) : void;public function complete ($skipRender:Boolean = false) : void;public static function removeTween ($t:TweenLite = null) : void;public static function killTweensOf ($tg:Object = null, $complete:Boolean = false) : void;public static function killGarbage ($e:TimerEvent) : void;public static function easeOut ($t:Number, $b:Number, $c:Number, $d:Number) : Number;protected function easeProxy ($t:Number, $b:Number, $c:Number, $d:Number) : Number;public static function tintProxy ($o:Object) : void;public static function frameProxy ($o:Object) : void;public static function volumeProxy ($o:Object) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Back.as
+package gs.easing{public class Back{public static function easeIn (t:Number, b:Number, c:Number, d:Number, s:Number = 1.70158) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number, s:Number = 1.70158) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number, s:Number = 1.70158) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Bounce.as
+package gs.easing{public class Bounce{public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Circ.as
+package gs.easing{public class Circ{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Cubic.as
+package gs.easing{public class Cubic{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\CustomEase.as
+package gs.easing{public class CustomEase{public static const VERSION : Number;private static var _all : Object;private var _segments : Array;private var _name : String;public static function create ($name:String, $segments:Array) : Function;public static function byName ($name:String) : Function;public function CustomEase ($name:String, $segments:Array);public function ease ($t:Number, $b:Number, $c:Number, $d:Number) : Number;public function destroy () : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Elastic.as
+package gs.easing{public class Elastic{private static const _2PI : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number, a:Number = 0, p:Number = 0) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number, a:Number = 0, p:Number = 0) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number, a:Number = 0, p:Number = 0) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Expo.as
+package gs.easing{public class Expo{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Linear.as
+package gs.easing{public class Linear{public static function easeNone (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Quad.as
+package gs.easing{public class Quad{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Quart.as
+package gs.easing{public class Quart{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Quint.as
+package gs.easing{public class Quint{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Sine.as
+package gs.easing{public class Sine{private static const _HALF_PI : Number;public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\easing\Strong.as
+package gs.easing{public class Strong{public static function easeIn (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeOut (t:Number, b:Number, c:Number, d:Number) : Number;public static function easeInOut (t:Number, b:Number, c:Number, d:Number) : Number;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\gs\events\TweenEvent.as
+package gs.events{import flash.events.Event;public class TweenEvent extends Event{public static const version : Number;public static const START : String;public static const UPDATE : String;public static const COMPLETE : String;public var info : Object;public function TweenEvent ($type:String, $info:Object = null, $bubbles:Boolean = false, $cancelable:Boolean = false);public function clone () : Event;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\Feature2Rects.as
+package jp.maaash.ObjectDetection{public class Feature2Rects extends FeatureBase{public var r1 : HaarRect;public var r2 : HaarRect;public function Feature2Rects (_th:Number, _lv:Number, _rv:Number, _r1:Array, _r2:Array);public function getSum (targetImage:TargetImage, offsetx:int, offsety:int) : Number;public function setScaleAndWeight (s:Number, w:Number) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\Feature3Rects.as
+package jp.maaash.ObjectDetection{public class Feature3Rects extends FeatureBase{public var r1 : HaarRect;public var r2 : HaarRect;public var r3 : HaarRect;public function Feature3Rects (_th:Number, _lv:Number, _rv:Number, _r1:Array, _r2:Array, _r3:Array);public function getSum (targetImage:TargetImage, offsetx:int, offsety:int) : Number;public function setScaleAndWeight (s:Number, w:Number) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\FeatureBase.as
+package jp.maaash.ObjectDetection{public class FeatureBase{public var threshold : Number;public var left_val : Number;public var right_val : Number;public var next : FeatureBase;public function FeatureBase (_th:Number, _lv:Number, _rv:Number);public function getSum (targetImage:TargetImage, x:int, y:int) : Number;public function setScaleAndWeight (s:Number, w:Number) : void;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\FeatureTree.as
+package jp.maaash.ObjectDetection{public class FeatureTree{public var stage_threshold : Number;public var next : FeatureTree;public var firstFeature : FeatureBase;public function FeatureTree ($stage_threshold:Number);}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\HaarCascade.as
+package jp.maaash.ObjectDetection{import flash.geom.Rectangle;public class HaarCascade{public var base_window_w : int;public var base_window_h : int;public var inv_window_area : Number;public var trees : Array;public var targetImage : TargetImage;private var _scale : Number;private var firstTree : FeatureTree;public function set scale (s:Number) : Void;public function HaarCascade ();private function init () : void;public function run (r:Rectangle) : int;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\HaarRect.as
+package jp.maaash.ObjectDetection{public class HaarRect{public var dx : int;public var dy : int;public var dw : int;public var dh : int;public var dweight : Number;public var sx : int;public var sy : int;public var sw : int;public var sh : int;public var sweight : Number;public function get area () : int;public function set scale (s:Number) : Void;public function set scale_weight (s:Number) : Void;public function HaarRect (d:Array);}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\ObjectDetector.as
+package jp.maaash.ObjectDetection{import flash.display.Bitmap;import flash.display.BitmapData;import flash.events.EventDispatcher;import flash.geom.Rectangle;public class ObjectDetector extends EventDispatcher{private var tgt : TargetImage;public var detected : Array;public var cascade : HaarCascade;private var _options : ObjectDetectorOptions;public function set bitmap (bmp:Bitmap) : Void;public function set options (opt:ObjectDetectorOptions) : Void;public function ObjectDetector ();public function detect (bmp:BitmapData) : void;private function _detect () : void;private function overlaps (rect:Rectangle) : Boolean;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\ObjectDetectorEvent.as
+package jp.maaash.ObjectDetection{import flash.events.Event;import flash.geom.Rectangle;public class ObjectDetectorEvent extends Event{public static const DETECTION_COMPLETE : String;public static const FACE_FOUND : String;public static const DETECTION_START : String;public var rect : Rectangle;public var rects : Array;public function ObjectDetectorEvent (t:String);public function clone () : Event;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\ObjectDetectorOptions.as
+package jp.maaash.ObjectDetection{public class ObjectDetectorOptions{public static const SCALE_FACTOR : Number;public static const MIN_SIZE : int;public static const MIN_MARGIN_SEARCH : int;public static const SEARCH_MODE_DEFAULT : int;public static const SEARCH_MODE_SOLO : int;public static const SEARCH_MODE_NO_OVERLAP : int;public static const INVALID_POS : int;public var search_mode : int;public var scale_factor : Number;public var min_size : int;public var startx : int;public var starty : int;public var endx : int;public var endy : int;}}
+#file-cache D:\Kuliah\Tugas Kuliah\Semester 7\Sistem Multimedia\collada01_2009-07\collada01\lib\marilena\jp\maaash\ObjectDetection\TargetImage.as
+package jp.maaash.ObjectDetection{import flash.display.BitmapData;import flash.utils.ByteArray;public class TargetImage{public var _ii : Array;public var _ii2 : Array;public var iiw : int;public var iih : int;public var width : int;public var height : int;public function set bitmapData (b:BitmapData) : Void;public function TargetImage ();public function getSum (x:int, y:int, w:int, h:int) : int;public function getSum2 (x:int, y:int, w:int, h:int) : int;public function getII (x:int, y:int) : int;public function getII2 (x:int, y:int) : int;}}

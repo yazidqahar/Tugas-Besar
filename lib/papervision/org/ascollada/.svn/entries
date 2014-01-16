@@ -1,0 +1,83 @@
+9
+
+dir
+915
+http://papervision3d.googlecode.com/svn/trunk/as3/trunk/src/org/ascollada
+http://papervision3d.googlecode.com/svn
+
+
+
+2009-05-26T22:00:10.866406Z
+912
+tim.knip
+
+
+svn:special svn:externals svn:needs-lock
+
+
+
+
+
+
+
+
+
+
+
+071aa1e1-232a-0410-a790-59abb25ab4c3
+
+namespaces
+dir
+
+utils
+dir
+
+physics
+dir
+
+types
+dir
+
+ASCollada.as
+file
+
+
+
+
+2009-06-21T18:19:48.343750Z
+c82bccf67dbc7ba6db1a0487e9f541e4
+2008-08-25T13:13:47.483717Z
+708
+neoriley
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+37322
+
+io
+dir
+
+core
+dir
+
+fx
+dir
+
